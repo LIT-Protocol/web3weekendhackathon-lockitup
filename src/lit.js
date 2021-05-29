@@ -1,7 +1,13 @@
 import LitJsSdk from 'lit-js-sdk'
 
-const createHtmlLit = ({ tokenAddress, encryptedZipDataUrl }) => {
-  const htmlBody = `<h1>Hello.  Only owners of the token at ${tokenAddress} can unlock this content</h1><button id=\'unlockButton>Unlock the content</button>`
+export const createHtmlWrapper = ({ tokenAddress, encryptedZipDataUrl }) => {
+  const htmlBody = `<h1>Hello.  Only owners of the token at ${tokenAddress} can unlock this content</h1>
+  <p>Token state: <span id='lockedHeader'>LOCKED</span></p>
+  <button id="unlockButton">Unlock the content</button>
+  <br/>
+  <br/>
+  <div id='mediaGridHolder'></div>
+  `
   return LitJsSdk.createHtmlLIT({
     title: `Locked Content for token holders at ${tokenAddress}`,
     htmlBody,

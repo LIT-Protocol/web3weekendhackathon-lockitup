@@ -1,23 +1,74 @@
 import React, { useState } from 'react'
 import './App.css'
 import LitJsSdk from 'lit-js-sdk'
+import { createHtmlWrapper } from './lit'
+
+function getRandomIntInclusive (min, max) {
+  min = Math.ceil(min)
+  max = Math.floor(max)
+  return Math.floor(Math.random() * (max - min + 1) + min) // The maximum is inclusive and the minimum is inclusive
+}
 
 function App () {
-  const [contractAddress, setContractAddress] = useState('')
+  const [contractAddress, setContractAddress] = useState('0xA9b2180C2A479Ba9b263878C4d81AE4e0E717846')
   const [content, setContent] = useState('')
+  const [fileUrl, setFileUrl] = useState(null)
 
-  const submit = () => {
+  const submit = async () => {
     console.log('submitted')
 
     // encrypt content
-    const lockedContentDataUrl = ''
-    const toEncrypt = `<a href="${lockedContentDataUrl}" target="_blank"/>Click here to get your locked content</a>`
+    const lockedContentDataUrl = await LitJsSdk.fileToDataUrl(content)
+    const toEncrypt = `<a href="${lockedContentDataUrl}" target="_blank"/>Click here to download your locked content</a>`
+    const { symmetricKey, encryptedZip } = await LitJsSdk.zipAndEncryptString(toEncrypt)
+
+    // create LIT HTML
+    const encryptedZipDataUrl = await LitJsSdk.fileToDataUrl(encryptedZip)
+    const htmlString = await createHtmlWrapper({
+      tokenAddress: contractAddress,
+      encryptedZipDataUrl
+    })
+    const litHtmlBlob = new Blob(
+      [htmlString],
+      { type: 'text/html' }
+    )
 
     // upload to IPFS
+    const formData = new FormData()
+    formData.append('file', litHtmlBlob)
+    const uploadPromise = new Promise((resolve, reject) => {
+      fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
+        method: 'POST',
+        mode: 'cors',
+        headers: {
+          Authorization: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySW5mb3JtYXRpb24iOnsiaWQiOiJkZTRlMWFkOC0xZDg3LTRlMzMtYmYyMC0zYWE3NjRhODc3YzQiLCJlbWFpbCI6ImNocmlzQGhlbGxvYXByaWNvdC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwicGluX3BvbGljeSI6eyJyZWdpb25zIjpbeyJpZCI6Ik5ZQzEiLCJkZXNpcmVkUmVwbGljYXRpb25Db3VudCI6MX1dLCJ2ZXJzaW9uIjoxfSwibWZhX2VuYWJsZWQiOmZhbHNlfSwiYXV0aGVudGljYXRpb25UeXBlIjoic2NvcGVkS2V5Iiwic2NvcGVkS2V5S2V5IjoiNzYyMDg4ZGZjYWI0MGRhNmEzYTIiLCJzY29wZWRLZXlTZWNyZXQiOiIxNWQ1NWMzM2M3YzRjZjkyZTRmNzkxNzYxMjMxNTg5Zjc3NWFmMDNjNGYyOWU5NWE0NTAzNjU4NjRjNzQ2MWJlIiwiaWF0IjoxNjIxMjk5MTUxfQ.rBlfJOgcpDNhecYV2-lNqWg5YRwhN7wvrnmxjRu7LEY'
+        },
+        body: formData
+      }).then(response => response.json())
+        .then(data => resolve(data))
+        .catch(err => reject(err))
+    })
+
+    // get auth sig
+    console.log('getting auth sig')
+    const authSig = await LitJsSdk.checkAndSignAuthMessage({ chain: 'kovan' })
+    console.log('got auth sig')
 
     // save key to LIT protocol
+    await window.litNodeClient.saveEncryptionKey({
+      tokenAddress: contractAddress,
+      tokenId: getRandomIntInclusive(1, Number.MAX_SAFE_INTEGER), // not used, not important, this is an erc20 token
+      symmetricKey,
+      authSig,
+      chain: 'kovan'
+    })
+
+    const uploadRespBody = await uploadPromise
+    const ipfsCid = uploadRespBody.IpfsHash
+    const fileUrl = `https://ipfs.io/ipfs/${ipfsCid}`
 
     // present URL to user
+    setFileUrl(fileUrl)
   }
   const handleContentChosen = (e) => {
     setContent(e.target.files[0])
@@ -43,6 +94,16 @@ function App () {
       <br />
       <br />
       <button onClick={submit}>Submit</button>
+      <br />
+      {fileUrl ? (
+        <>
+          <h1>Your locked content is available here: </h1>
+          <a href={fileUrl} target='_blank'>{fileUrl}</a>
+          <p><strong>Save this url</strong> and make sure it's available to your token holders so they can unlock your content.</p>
+        </>
+      )
+        : null}
+      <br />
       <br />
       <br />
       <h3>Instructions from scratch to mint and sell your token and locked content:</h3>
