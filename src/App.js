@@ -17,16 +17,20 @@ function App () {
   const submit = async () => {
     console.log('submitted')
 
+    // make a fake tokenId because we are using erc20
+    const tokenId = getRandomIntInclusive(1, Number.MAX_SAFE_INTEGER)
+
     // encrypt content
     const lockedContentDataUrl = await LitJsSdk.fileToDataUrl(content)
-    const toEncrypt = `<a href="${lockedContentDataUrl}" target="_blank"/>Click here to download your locked content</a>`
+    const toEncrypt = `<a href="${lockedContentDataUrl}" target="_blank" download="${content.name}"/>Click here to download your locked content</a>`
     const { symmetricKey, encryptedZip } = await LitJsSdk.zipAndEncryptString(toEncrypt)
 
     // create LIT HTML
     const encryptedZipDataUrl = await LitJsSdk.fileToDataUrl(encryptedZip)
     const htmlString = await createHtmlWrapper({
       tokenAddress: contractAddress,
-      encryptedZipDataUrl
+      encryptedZipDataUrl,
+      tokenId
     })
     const litHtmlBlob = new Blob(
       [htmlString],
@@ -57,7 +61,7 @@ function App () {
     // save key to LIT protocol
     await window.litNodeClient.saveEncryptionKey({
       tokenAddress: contractAddress,
-      tokenId: getRandomIntInclusive(1, Number.MAX_SAFE_INTEGER), // not used, not important, this is an erc20 token
+      tokenId,
       symmetricKey,
       authSig,
       chain: 'kovan'
